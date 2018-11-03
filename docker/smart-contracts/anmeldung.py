@@ -1,151 +1,209 @@
-"""
-Testing:
+# build /smart-contracts/anmeldung.py test 0710 07 True False False "onboard" ["issuer", "userId", "signedHashOfDoc"]]
 
-neo> build 4-domain.py test 0710 05 True False query ["test.com"]
-neo> build 4-domain.py test 0710 05 True False register ["test.com","AK2nJJpJr6o664CWJKi1QRXjqeic2zRp8y"]
-neo> build 4-domain.py test 0710 05 True False delete ["test.com"]
-neo> build 4-domain.py test 0710 05 True False transfer ["test.com","AK2nJJpJr6o664CWJKi1QRXjqeic"]
 
-Importing:
-
-neo> import contract 4-domain.avm 0710 05 True False
-neo> contract search ...
-
-Using:
-
-neo> testinvoke 5030694901a527908ab0a1494670109e7b85e3e4 query ["test.com"]
-neo> testinvoke 5030694901a527908ab0a1494670109e7b85e3e4 register ["test.com","AK2nJJpJr6o664CWJKi1QRXjqeic2zRp8y"]
-neo> testinvoke 5030694901a527908ab0a1494670109e7b85e3e4 delete ["test.com"]
-neo> testinvoke 5030694901a527908ab0a1494670109e7b85e3e4 transfer ["test.com","AZ9Bmz6qmboZ4ry1z8p2KF3ftyA2ckJAym"]
-"""
 from boa.interop.Neo.Runtime import Log, Notify
 from boa.interop.Neo.Storage import Get, Put, GetContext
-from boa.interop.Neo.Runtime import GetTrigger,CheckWitness
+from boa.interop.Neo.Runtime import GetTrigger, CheckWitness
 from boa.builtins import concat
 
 
-def Main(operation, args):
-    nargs = len(args)
-    if nargs == 0:
-        print("No domain name supplied")
-        return 0
+def RevokeAttestation(from_issuer, user_id):
 
-
-    if oepration == "onboard":
-        issuer = args[0]
-        user_id = args[1]
-        attestation = args[2]
-
-        if nargs < 3:
-            print("required arguments: [issuer] [userId] [signedHashOfDoc]")
-            return 0
-
-        return OnboardAttestation(issuer, user_id, attestation)
-
-    if operation == "getAttestation":
-        from_issuer = args[0]
-        user_id = args[1]
-
-        if nargs < 2:
-            print("required arguments: [issuer] [userId]")
-            return 0
-
-        return GetAttestation(from_issuer, user_id)
-
-    if operation == "revokeAttestation":
-        from_issuer = args[0]
-        user_id = args[1]
-
-        if nargs < 2:
-            print("required arguments: [issuer] [userId]")
-            return 0
-
-        return RevokeAttestation(from_issuer, user_id)
-
-
-    if operation == "isAttestationValid":
-        attestation = args[0]
-
-        return IsAttestationVAlid(attestation)
-
-
-
-
-
-def OnboardAttestation(issuer, user_id, attestation):
-    msg = concat("Doing OnboardAttestation: [{0}] [{1}] [{2}]".format(issuer, user_id, attestation))
-    Notify(msg)
-
-    if not CheckWitness(issuer):
-        Notify("Issuer argument is not the same as the sender")
-        return False
-
-    issuer_user_key = "{0}.{1}".format(issuer, user_id)
-    context = GetContext()
-    # exists = Get(context, issuer_user_key)
-    # if exists:
-    #     What should we do in this case? Overwrite the document
-    #     return False
-
-    Put(context, issuer_user_key, attestation)
-    return True
-
-def GetAttestation(from_issuer, user_id):
-    msg = concat("GetAttestation: {0} {1}".format(from_issuer, user_id))
-    Notify(msg)
-
-    issuer_user_key = "{0}.{1}".format(from_issuer, user_id)
-    context = GetContext()
-    attestation = Get(context, issuer_user_key)
-
-    return attestation
-
-
-def RevokeAttestation(from_issuer, user_id)
-    msg = concat("RevokeAttestation: ", attestation)
-    Notify(msg)
-
-    attestation = GetAttestation(from_issuer, user_id)
-    context = GetContext()
     # add attestation to blacklist storage
 
     return True
 
-def TransferDomain(domain_name, to_address):
-    msg = concat("TransferDomain: ", domain_name)
+
+def IsAttestationValid(attestation):
+    msg = concat("IsAttestationValid: ", attestation)
     Notify(msg)
 
-    context = GetContext()
-    owner = Get(context, domain_name)
-    if not owner:
-        Notify("Domain is not yet registered")
-        return False
-
-    if not CheckWitness(owner):
-        Notify("Sender is not the owner, cannot transfer")
-        return False
-
-    if not len(to_address) != 34:
-        Notify("Invalid new owner address. Must be exactly 34 characters")
-        return False
-
-    Put(context, domain_name, to_address)
     return True
 
 
-def DeleteDomain(domain_name):
-    msg = concat("DeleteDomain: ", domain_name)
-    Notify(msg)
+def deserialize_bytearray(data):
 
-    context = GetContext()
-    owner = Get(context, domain_name)
-    if not owner:
-        Notify("Domain is not yet registered")
-        return False
+    collection_length_length = data[0:1]
 
-    if not CheckWitness(owner):
-        Notify("Sender is not the owner, cannot transfer")
-        return False
+    # get length of collection
+    collection_len = data[1:collection_length_length + 1]
 
-    Delete(context, domain_name)
-    return True
+    # create a new collection
+    new_collection = list(length=collection_len)
+
+    # trim the length data
+    offset = 1 + collection_length_length
+
+    for i in range(0, collection_len):
+
+        # get the data length length
+        itemlen_len = data[offset:offset + 1]
+
+        # get the length of the data
+        item_len = data[offset + 1:offset + 1 + itemlen_len]
+
+        # get the data
+        item = data[offset + 1 + itemlen_len: offset +
+                    1 + itemlen_len + item_len]
+
+        # store it in collection
+        new_collection[i] = item
+
+        offset = offset + item_len + itemlen_len + 1
+
+    return new_collection
+
+
+def serialize_array(items):
+
+    # serialize the length of the list
+    itemlength = serialize_var_length_item(items)
+
+    output = itemlength
+
+    # now go through and append all your stuff
+    for item in items:
+
+        # get the variable length of the item
+        # to be serialized
+        itemlen = serialize_var_length_item(item)
+
+        # add that indicator
+        output = concat(output, itemlen)
+
+        # now add the item
+        output = concat(output, item)
+
+    # return the stuff
+    return output
+
+
+def serialize_var_length_item(item):
+
+    # get the length of your stuff
+    stuff_len = len(item)
+
+    # now we need to know how many bytes the length of the array
+    # will take to store
+
+    # this is one byte
+    if stuff_len <= 255:
+        byte_len = b'\x01'
+    # two byte
+    elif stuff_len <= 65535:
+        byte_len = b'\x02'
+    # hopefully 4 byte
+    else:
+        byte_len = b'\x04'
+
+    out = concat(byte_len, stuff_len)
+
+    return out
+
+# def DeleteDomain(domain_name):
+#     msg = concat("DeleteDomain: ", domain_name)
+#     Notify(msg)
+
+#     context = GetContext()
+#     owner = Get(context, domain_name)
+#     if not owner:
+#         Notify("Domain is not yet registered")
+#         return False
+
+#     if not CheckWitness(owner):
+#         Notify("Sender is not the owner, cannot transfer")
+#         return False
+
+#     Delete(context, domain_name)
+#     return True
+
+
+def Main(operation, args):
+    print("THE operation")
+    print(operation)
+
+    if operation == 'onboard':
+        issuer = args[0]
+        user_id = args[1]
+        attestation = args[2]
+
+        print("THE issuer")
+        print(issuer)
+        print("THE userid")
+        print(user_id)
+        print("THE attestation")
+        print(attestation)
+
+        # if not CheckWitness(issuer):
+        #     Notify("Issuer argument is not the same as the sender")
+        #     return False
+
+        issuer_user_key = concat(issuer, user_id)
+        context = GetContext()
+        # exists = Get(context, issuer_user_key)
+        # if exists:
+        #     # What should we do in this case? Overwrite the document
+        #     return False
+
+        Put(context, issuer_user_key, attestation)
+        return "Done"
+
+        # return OnboardAttestation(issuer, user_id, attestation)
+
+    elif operation == 'getAttestation':
+        from_issuer = args[0]
+        user_id = args[1]
+
+        issuer_user_key = concat(from_issuer, user_id)
+
+        context = GetContext()
+        attestation = Get(context, issuer_user_key)
+
+        print("THEattestation")
+        print(attestation)
+
+        return attestation
+
+    elif operation == "revokeAttestation":
+        from_issuer = args[0]
+        user_id = args[1]
+
+        issuer_user_key = concat(from_issuer, user_id)
+        print(issuer_user_key)
+
+        context = GetContext()
+        attestation = Get(context, issuer_user_key)
+        print("ABOUTto revoke")
+        print(attestation)
+
+        blacklist_bytes = Get(context, "blacklist")
+        actual_blacklist = deserialize_bytearray(blacklist_bytes)
+
+        print("OLDblacklist")
+        print(actual_blacklist)
+
+        actual_blacklist.append(attestation)
+
+        print("NEWblacklist")
+        print(actual_blacklist)
+        new_blacklist = serialize_array(actual_blacklist)
+
+        print(new_blacklist)
+        # Put(context, "blacklist", new_blacklist)
+
+        return "Done"
+
+    elif operation == "isAttestationValid":
+        attestation = args[0]
+
+        context = GetContext()
+        blacklist_bytes = Get(context, "blacklist")
+        actual_blacklist = deserialize_bytearray(blacklist_bytes)
+
+        # get global attestation table
+        # check if attestation is in table
+        # if in table -> return false
+        # if not in table -> return true
+        return "Valid"
+
+    return "Error: operation not recognised"

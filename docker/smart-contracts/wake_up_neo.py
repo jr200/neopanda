@@ -1,3 +1,6 @@
 from boa.interop.Neo.Runtime import Log
-def Main():
-  Log("Wake up, NEO!")
+from boa.builtins import concat
+
+
+def Main(operation):
+    Log(operation)
