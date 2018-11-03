@@ -189,9 +189,9 @@ def Main(operation, args):
         new_blacklist = serialize_array(actual_blacklist)
 
         print(new_blacklist)
-        # Put(context, "blacklist", new_blacklist)
+        Put(context, "blacklist", new_blacklist)
 
-        return "Done"
+        return "Success"
 
     elif operation == "isAttestationValid":
         attestation = args[0]
@@ -200,10 +200,10 @@ def Main(operation, args):
         blacklist_bytes = Get(context, "blacklist")
         actual_blacklist = deserialize_bytearray(blacklist_bytes)
 
-        # get global attestation table
-        # check if attestation is in table
-        # if in table -> return false
-        # if not in table -> return true
+        for blacklisted_attestation in actual_blacklist:
+            if blacklisted_attestation == attestation:
+                return "Invalid"
+
         return "Valid"
 
     return "Error: operation not recognised"
