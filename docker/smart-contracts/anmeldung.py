@@ -7,20 +7,6 @@ from boa.interop.Neo.Runtime import GetTrigger, CheckWitness
 from boa.builtins import concat
 
 
-def RevokeAttestation(from_issuer, user_id):
-
-    # add attestation to blacklist storage
-
-    return True
-
-
-def IsAttestationValid(attestation):
-    msg = concat("IsAttestationValid: ", attestation)
-    Notify(msg)
-
-    return True
-
-
 def deserialize_bytearray(data):
 
     collection_length_length = data[0:1]
@@ -99,23 +85,6 @@ def serialize_var_length_item(item):
     out = concat(byte_len, stuff_len)
 
     return out
-
-# def DeleteDomain(domain_name):
-#     msg = concat("DeleteDomain: ", domain_name)
-#     Notify(msg)
-
-#     context = GetContext()
-#     owner = Get(context, domain_name)
-#     if not owner:
-#         Notify("Domain is not yet registered")
-#         return False
-
-#     if not CheckWitness(owner):
-#         Notify("Sender is not the owner, cannot transfer")
-#         return False
-
-#     Delete(context, domain_name)
-#     return True
 
 
 def Main(operation, args):
@@ -199,6 +168,9 @@ def Main(operation, args):
         context = GetContext()
         blacklist_bytes = Get(context, "blacklist")
         actual_blacklist = deserialize_bytearray(blacklist_bytes)
+
+        print("THEactualblacklist")
+        print(actual_blacklist)
 
         for blacklisted_attestation in actual_blacklist:
             if blacklisted_attestation == attestation:
