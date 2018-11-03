@@ -2,6 +2,7 @@ version: '3'
 services:
   web:
     image: tiangolo/uwsgi-nginx-flask:python3.6
+    hostname: web 
     volumes:
       - ./app:/app
     ports:
@@ -14,3 +15,9 @@ services:
     command: bash -c "pip install flask_cors && flask run --host=0.0.0.0 --port=80"
     # Infinite loop, to keep it alive, for debugging
     # command: bash -c "while true; do echo 'sleeping...' && sleep 10; done"
+    networks:
+      - neopanda_backend
+
+networks:
+  neopanda_backend:
+    driver: bridge
