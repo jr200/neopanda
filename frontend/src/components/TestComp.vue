@@ -1,10 +1,21 @@
 <template>
   <div class="container">
-    <div class="large-12 medium-12 small-12 cell">
-      <label>File
+    <div class="file_upload">
+      <label>
+        File
         <input type="file" id="file" ref="file" v-on:change="handleFileUpload()"/>
       </label>
-        <button v-on:click="submitFile()">Submit</button>
+    </div>
+    <!-- <div class="user_id">
+      <v-text-field
+        label="User Id"
+        outline
+        required
+        v-model="userId">
+      </v-text-field>
+    </div> -->
+    <div class="submit">
+      <v-btn v-on:click="submitFile()">Submit</v-btn>
     </div>
   </div>
 </template>
@@ -16,7 +27,8 @@ import axios from 'axios';
     data(){
       return {
         file: '',
-        text: ''
+        text: '',
+        userId: ''
       }
     },
     methods: {
@@ -48,25 +60,25 @@ import axios from 'axios';
       submitData(){
       },
       submitFile(){
-        let formData = new FormData();
-        formData.append('file', this.file);
-        axios.post( '/single-file',
-          formData,
-          {
-            headers: {
-                'Content-Type': 'multipart/form-data'
-            }
-          }
-        ).then(function(){
-          console.log('SUCCESS!!');
-        })
-        .catch(function(){
-          console.log('FAILURE!!');
+        const api = axios.create({baseURL: 'http://localhost:80'})
+        api.post('/temp', {
+            document: this.text,
+            userId: this.userId
+        }).then((response) => {
+               console.log(response);
         });
       },
     }
   }
 </script>
 
-<style lang="css">
+<style scoped>
+  .file_upload {
+    margin-top: 50px;
+    margin-left: 50px;
+  }
+  .submit {
+    margin-top: 50px;
+    margin-left: 50px;
+  }
 </style>

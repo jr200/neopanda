@@ -3,13 +3,14 @@ import Router from 'vue-router'
 import HelloWorld from '@/components/HelloWorld'
 import Contacts from '@/components/Contacts'
 import TestComp from '@/components/TestComp'
+import Registration from '@/components/Registration'
 
 Vue.use(Router)
 
 export default new Router({
   routes: [
     {
-      path: '/',
+      path: '/HelloWorld',
       name: 'HelloWorld',
       component: HelloWorld
     },
@@ -19,9 +20,14 @@ export default new Router({
       component: Contacts
     },
     {
-      path: '/TestComp',
+      path: '/Verify',
       name: 'TestComp',
       component: TestComp
+    },
+    {
+      path: '/',
+      name: 'Registration',
+      component: Registration
     }
   ]
 })

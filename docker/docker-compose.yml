@@ -1,6 +1,26 @@
----
 version: "3"
 services:
+  web:
+    image: tiangolo/uwsgi-nginx-flask:python3.6
+    volumes:
+      - ./backend:/app
+      - ./demo-keys:/demo-keys
+    ports:
+      - "2486:80"
+    environment:
+      - FLASK_APP=main.py
+      - FLASK_DEBUG=1
+      - 'RUN=flask run --host=0.0.0.0 --port=80'
+    # command: flask run --host=0.0.0.0 --port=80
+    command: bash -c "pip install flask_cors requests neo-python rsa && flask run --host=0.0.0.0 --port=80"
+    # Infinite loop, to keep it alive, for debugging
+    # command: bash -c "while true; do echo 'sleeping...' && sleep 10; done"
+    links:
+      - "neo-nodes:30333"
+      - "neo-nodes:30334"
+      - "neo-nodes:30335"
+      - "neo-nodes:30336"
+ 
   neo-faucet:
     container_name: neo-faucet
     depends_on:
@@ -12,6 +32,7 @@ services:
       - "neo-scan-api:4000"
     ports:
       - "4002:4002"
+
 
   neo-nodes:
     container_name: neo-nodes
@@ -39,6 +60,7 @@ services:
       - "./smart-contracts:/smart-contracts"
       - "./wallets:/wallets"
 
+
   neo-scan-api:
     container_name: neo-scan-api
     depends_on:
@@ -64,6 +86,7 @@ services:
     ports:
     - "4000:4000"
 
+
   neo-scan-sync:
     container_name: neo-scan-sync
     depends_on:
@@ -85,6 +108,7 @@ services:
       - "neo-nodes:30335"
       - "neo-nodes:30336"
 
+
   notifications-server:
     command: "/usr/bin/python3 /neo-python/neo/bin/api_server.py --config /neo-python/custom-config.json --port-rest 8080"
     container_name: notifications-server
@@ -96,6 +120,7 @@ services:
     volumes:
       - "./notifications-server.config.json:/neo-python/custom-config.json"
 
+
   postgres:
     container_name: postgres
     environment:
@@ -105,3 +130,4 @@ services:
     expose:
       - 5432
     image: postgres:10.5
+
