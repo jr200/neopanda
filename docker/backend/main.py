@@ -12,17 +12,14 @@ import binascii
 import hashlib
 from neo.Implementations.Wallets.peewee.UserWallet import UserWallet
 from neo.Core.TX.InvocationTransaction import InvocationTransaction
-from neo.Core.TX.TransactionAttribute import TransactionAttribute, TransactionAttributeUsage
-from neo.Core.CoinReference import CoinReference
 from neo.SmartContract.ContractParameterContext import ContractParametersContext
 from neocore.Fixed8 import Fixed8
 from neocore.UInt256 import UInt256
 from neocore.UInt160 import UInt160
 from neocore.KeyPair import KeyPair
-from neo import Blockchain
-from base58 import b58decode
 from neo.VM.ScriptBuilder import ScriptBuilder
 from neo.Wallets.utils import to_aes_key
+from neojsonrpc import Client
 
 
 app = Flask(__name__)
@@ -33,7 +30,7 @@ NO_DATA = 1
 INVALID_FIELD = 2
 
 HASH_METHOD = "SHA-512"
-CONTRACT_HASH = "0x7f57275327051ef65a1e9b9b441138e9b0af2604"
+CONTRACT_HASH = "0x305bef9b7c8056002ae137f06043cad6deb55da3"
 
 
 @app.route("/")
@@ -211,12 +208,6 @@ def runRawTransaction(operation, args):
 @app.route("/onboardPerson", methods=["POST", "GET"])
 def onboardPerson():
     print("called onboardPerson", file=sys.stderr)
-    validation_result = validateDocumentData(request.data)
-
-    if validation_result == NO_DATA:
-        return getJsonResponse(400, "Error", "No document data provided")
-    elif validation_result == INVALID_FIELD:
-        return getJsonResponse(400, "Error", "Not all fields are valid")
 
     data = request.json["data"]
     user_id = data["userId"]
@@ -231,7 +222,7 @@ def onboardPerson():
     issuerPrivateKey = rsa.PrivateKey.load_pkcs1(file_data, "PEM")
     docHash = rsa.compute_hash(json.dumps(data).encode("utf-8"), HASH_METHOD)
     signedDocHash = rsa.sign_hash(docHash, issuerPrivateKey, HASH_METHOD)
-    signedDocHash = base64.encodestring(signedDocHash).decode("ascii")
+    # signedDocHash = base64.encodestring(signedDocHash).decode("ascii")
 
     userPublicKeyFile = getKeys(user_id)["public"]
     print(userPublicKeyFile)
@@ -249,13 +240,13 @@ def onboardPerson():
 
     # post to blockchain
     result = runRawTransaction(
-        'onboard', [b"Munich", user_id.encode("utf-8"), signedDocHash.encode("utf-8")])
+        'onboard', [b"Munich", user_id.encode("utf-8"), signedDocHash])
 
     print(result)
 
     res = {
         "docHash": base64.encodestring(docHash).decode("ascii"),
-        "signedDocHash": signedDocHash,
+        "signedDocHash": base64.encodestring(signedDocHash).decode("ascii"),
         "verifyUserResult": verifyUserResult,
         "smartContractResult": result,
         # "raw_tx": raw_tx.decode("ascii"),
@@ -284,37 +275,25 @@ def checkAttestation():
 
     issuerPublicKey = rsa.PublicKey.load_pkcs1(file_data)
 
-    print(issuerId)
-    print(user_id)
-    SC_getAttestation_payload = {
-        "jsonrpc": "2.0",
-        "method": "invokefunction",
-        "params": [
-            CONTRACT_HASH,
-            "getAttestation",
-            [
-                {"type": "String", "value": issuerId},
-                {"type": "String", "value": user_id}
-            ]
-        ],
-    }
+    client = Client(host='neo-nodes', port='30333')
+    result = client.invoke_function(
+        CONTRACT_HASH, "getAttestation", [issuerId.encode("utf-8"), user_id.encode("utf-8")])
 
-    SC_getAttestation_res = requests.post(
-        "http://neo-nodes:30333/", json=SC_getAttestation_payload)
-    attestation = SC_getAttestation_res.text
+    result = {"tx": "x"}
+    print(json.dumps(result))
+    attestation = result["tx"]
 
-    # try:
-    #     verify = rsa.verify(json.dumps(data).encode(
-    #         "utf-8"), attestation.encode("ascii"), issuerPublicKey)
-    #     verifyResult = "Success"
-    # except rsa.pkcs1.VerificationError as e:
-    #     verifyResult = "Failed"
+    try:
+        # verify = rsa.verify(
+        #     docHash, attestation.encode("utf-8"), issuerPublicKey)
+        verifyUserResult = "Success"
+    except rsa.pkcs1.VerificationError as e:
+        verifyUserResult = "Failed"
 
+    print("X", flush=True)
     return json.dumps({
-        # "verifyResult": verifyResult,
-        "result": "X",
+        "verifyResult": verifyUserResult,
         # "req": json.dumps(SC_getAttestation_payload),
-        "attestationRes": attestation
     })
 
 
