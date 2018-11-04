@@ -33,7 +33,7 @@ NO_DATA = 1
 INVALID_FIELD = 2
 
 HASH_METHOD = "SHA-512"
-CONTRACT_HASH = "0x42f4812ca95d2e1530b2cc19964340a3e881266e"
+CONTRACT_HASH = "0xb3bcbda2439fb3129f302c33b8a17f72210f29a3"
 
 
 @app.route("/")
@@ -219,7 +219,7 @@ def onboardPerson():
     sb.EmitAppCallWithOperationAndArgs(
         smartcontract_scripthash,
         'onboard',
-        [b'Munich1', b'tai.lung@mail.com1', b'xxx'])
+        [b"Munich", user_id.encode("utf-8"), signedDocHash.encode("utf-8")])
     invocation_tx.Script = binascii.unhexlify(sb.ToArray())
 
     wallet = UserWallet.Create(
