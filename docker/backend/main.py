@@ -22,6 +22,26 @@ def default():
     return "Here is nothing"
 
 
+def getPublicKey(identity):
+
+    id_map = {
+        "tai.lung@gmail.com": {
+            "public": "/demo-keys/tailung_rsa.pem.pub",
+            "private": "/demo-keys/tailung_rsa"
+        },
+        "munich": {
+            "public": "/demo-keys/munich_rsa.pem.pub",
+            "private": "/demo-keys/munich_rsa"
+        },
+        "zurich": {
+            "public": "/demo-keys/zurich_rsa.pem.pub",
+            "private": "/demo-keys/zurich_rsa"
+        }
+    }
+
+    return id_map[identity.lower()]
+
+
 @app.route("/signData", methods=["POST", "GET"])
 def signData():
     user_id = request.json["userId"]
@@ -94,7 +114,6 @@ def testNeoConnection():
 @app.route("/onboardPerson", methods=["POST", "GET"])
 def onboardPerson():
     print("called onboardPerson", file=sys.stderr)
-    print(request.data, file=sys.stderr)
     validation_result = validateDocumentData(request.data)
 
     if validation_result == NO_DATA:
@@ -102,7 +121,58 @@ def onboardPerson():
     elif validation_result == INVALID_FIELD:
         return getJsonResponse(400, "Error", "Not all fields are valid")
 
-    return getJsonResponse(200, "Approved", "Document data posted successfully")
+    data = request.json["data"]
+    user_id = data["userId"]
+    print(user_id)
+    signedUserId = request.json["signedUserId"]
+    signedUserId = base64.decodestring(signedUserId.encode("ascii"))
+
+    issuerPrivateKeyFile = getPublicKey("Munich")["private"]
+    with open(issuerPrivateKeyFile, 'r') as f:
+        file_data = f.read()
+
+    issuerPrivateKey = rsa.PrivateKey.load_pkcs1(file_data, "PEM")
+    docHash = rsa.compute_hash(json.dumps(data).encode("utf-8"), HASH_METHOD)
+    signedDocHash = rsa.sign_hash(docHash, issuerPrivateKey, HASH_METHOD)
+    signedDocHash = base64.encodestring(signedDocHash).decode("ascii")
+
+    userPublicKeyFile = getPublicKey(user_id)["public"]
+    print(userPublicKeyFile)
+    with open(userPublicKeyFile, 'r', encoding="ascii") as f:
+        file_data = f.read()
+
+    userPublicKey = rsa.PublicKey.load_pkcs1(file_data)
+
+    try:
+        verify = rsa.verify(user_id.encode("utf-8"),
+                            signedUserId, userPublicKey)
+        verifyUserResult = "Success"
+    except rsa.pkcs1.VerificationError as e:
+        verifyUserResult = "Failed"
+
+    # post to blockchain
+    SC_onboardPayload = [
+        "Munich",
+        user_id,
+        signedDocHash
+    ]
+
+    sc_res = requests.post(
+        "http://neo-nodes:30333/onboard", json=SC_onboardPayload)
+    print("received POST result")
+    print(sc_res.status_code)
+    # result = sc_res.json()
+    # print(result)
+
+    res = {
+        "docHash": base64.encodestring(docHash).decode("ascii"),
+        "signedDocHash": signedDocHash,
+        "verifyUserResult": verifyUserResult,
+        # "smartContractResult": result
+
+    }
+
+    return json.dumps(res)
 
 
 @app.route("/checkAttestation", methods=["POST", "GET"])
