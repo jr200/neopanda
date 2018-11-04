@@ -35,14 +35,12 @@ def signData():
     user_id_hash = rsa.compute_hash(user_id.encode("utf-8"), HASH_METHOD)
 
     signedUserId = rsa.sign_hash(user_id_hash, privateKey, HASH_METHOD)
-    print(signedUserId)
-    signedUserId = base64.encodestring(signedUserId).decode("ascii")
 
     res = {
         "userId": user_id,
-        "userIdHash": base64.encodestring(user_id_hash).decode("ascii"),
+        # "userIdHash": base64.encodestring(user_id_hash).decode("ascii"),
         "privateKeyFile": privateKeyFile,
-        "signedUserId": signedUserId
+        "signedUserId": base64.encodestring(signedUserId).decode("ascii")
     }
 
     return json.dumps(res)
@@ -67,13 +65,12 @@ def verifyData():
         verifyResult = "Success"
     except rsa.pkcs1.VerificationError as e:
         verifyResult = "Failed"
-        raise e
 
     res = {
         "userId": user_id,
-        "userIdHash": base64.encodestring(user_id_hash).decode("ascii"),
+        # "userIdHash": base64.encodestring(user_id_hash).decode("ascii"),
         "publicKeyFile": publicKeyFile,
-        # "signedUserId": signedUserId,
+        # "signedUserId": base64.encodestring(signedUserId).decode("ascii"),
         "verifyResult": verifyResult
     }
 
