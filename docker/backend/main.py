@@ -33,7 +33,7 @@ NO_DATA = 1
 INVALID_FIELD = 2
 
 HASH_METHOD = "SHA-512"
-CONTRACT_HASH = "0xb3bcbda2439fb3129f302c33b8a17f72210f29a3"
+CONTRACT_HASH = "0x7f57275327051ef65a1e9b9b441138e9b0af2604"
 
 
 @app.route("/")
@@ -172,6 +172,42 @@ def testNeoClient():
     })
 
 
+def runRawTransaction(operation, args):
+    invocation_tx = InvocationTransaction()
+
+    smartcontract_scripthash = UInt160.ParseString(CONTRACT_HASH)
+    sb = ScriptBuilder()
+    sb.EmitAppCallWithOperationAndArgs(
+        smartcontract_scripthash,
+        operation,
+        args)
+    invocation_tx.Script = binascii.unhexlify(sb.ToArray())
+
+    wallet = UserWallet.Create(
+        'neo-privnet.wallet', to_aes_key('coz'), generate_default_key=False)
+    private_key = KeyPair.PrivateKeyFromWIF(
+        "KxDgvEKzgSBPPfuVfw67oPQBSjidEiqTHURKSDL1R7yGaGYAeYnr")
+
+    wallet.CreateKey(private_key)
+    context = ContractParametersContext(invocation_tx)
+    wallet.Sign(context)
+
+    invocation_tx.scripts = context.GetScripts()
+    raw_tx = invocation_tx.ToArray()
+
+    payload = {"jsonrpc": "2.0", "id": 1,
+               "method": "sendrawtransaction",
+               "params": [raw_tx.decode("ascii")]}
+
+    res = requests.post(
+        "http://neo-nodes:30333/testNeoConnection", json=payload)
+    print("received POST result")
+    print(res.status_code)
+    result = res.text
+    print(result)
+    return result
+
+
 @app.route("/onboardPerson", methods=["POST", "GET"])
 def onboardPerson():
     print("called onboardPerson", file=sys.stderr)
@@ -212,37 +248,9 @@ def onboardPerson():
         verifyUserResult = "Failed"
 
     # post to blockchain
-    invocation_tx = InvocationTransaction()
+    result = runRawTransaction(
+        'onboard', [b"Munich", user_id.encode("utf-8"), signedDocHash.encode("utf-8")])
 
-    smartcontract_scripthash = UInt160.ParseString(CONTRACT_HASH)
-    sb = ScriptBuilder()
-    sb.EmitAppCallWithOperationAndArgs(
-        smartcontract_scripthash,
-        'onboard',
-        [b"Munich", user_id.encode("utf-8"), signedDocHash.encode("utf-8")])
-    invocation_tx.Script = binascii.unhexlify(sb.ToArray())
-
-    wallet = UserWallet.Create(
-        'neo-privnet.wallet', to_aes_key('coz'), generate_default_key=False)
-    private_key = KeyPair.PrivateKeyFromWIF(
-        "KxDgvEKzgSBPPfuVfw67oPQBSjidEiqTHURKSDL1R7yGaGYAeYnr")
-
-    wallet.CreateKey(private_key)
-    context = ContractParametersContext(invocation_tx)
-    wallet.Sign(context)
-
-    invocation_tx.scripts = context.GetScripts()
-    raw_tx = invocation_tx.ToArray()
-
-    payload = {"jsonrpc": "2.0", "id": 1,
-               "method": "sendrawtransaction",
-               "params": [raw_tx.decode("ascii")]}
-
-    res = requests.post(
-        "http://neo-nodes:30333/testNeoConnection", json=payload)
-    print("received POST result")
-    print(res.status_code)
-    result = res.text
     print(result)
 
     res = {
@@ -250,8 +258,8 @@ def onboardPerson():
         "signedDocHash": signedDocHash,
         "verifyUserResult": verifyUserResult,
         "smartContractResult": result,
-        "raw_tx": raw_tx.decode("ascii"),
-        "payload": payload,
+        # "raw_tx": raw_tx.decode("ascii"),
+        # "payload": payload,
     }
 
     return json.dumps(res)
@@ -260,49 +268,53 @@ def onboardPerson():
 @app.route("/checkAttestation", methods=["POST", "GET"])
 def checkAttestation():
     print("called checkAttestation")
-    validation_result = validateAttestationData(request.data)
-
-    if validation_result == NO_DATA:
-        return getJsonResponse(400, "Error", "No attestation data provided")
-    elif validation_result == INVALID_FIELD:
-        return getJsonResponse(400, "Error", "Not all fields are valid")
 
     data = request.json["data"]
     user_id = data["userId"]
-    print(user_id)
     signedUserId = request.json["signedUserId"]
     signedUserId = base64.decodestring(signedUserId.encode("ascii"))
 
     docHash = rsa.compute_hash(json.dumps(data).encode("utf-8"), HASH_METHOD)
 
+    # verify document was signed by issuer
     issuerId = request.json["issuerId"]
     issuerPublicKeyFile = getKeys(issuerId)["public"]
     with open(issuerPublicKeyFile, 'r', encoding="ascii") as f:
         file_data = f.read()
 
     issuerPublicKey = rsa.PublicKey.load_pkcs1(file_data)
-    try:
-        verify = rsa.verify(json.dumps(data).encode(
-            "utf-8"), signedUserId, issuerPublicKey)
-        verifyResult = "Success"
-    except rsa.pkcs1.VerificationError as e:
-        verifyResult = "Failed"
 
+    print(issuerId)
+    print(user_id)
     SC_getAttestation_payload = {
         "jsonrpc": "2.0",
         "method": "invokefunction",
         "params": [
             CONTRACT_HASH,
-            ["getAttestation",
-             [issuerId, user_id]
-             ]]
+            "getAttestation",
+            [
+                {"type": "String", "value": issuerId},
+                {"type": "String", "value": user_id}
+            ]
+        ],
     }
+
     SC_getAttestation_res = requests.post(
-        "http://neo-nodes:30333/testNeoConnection", json=SC_getAttestation_payload)
+        "http://neo-nodes:30333/", json=SC_getAttestation_payload)
+    attestation = SC_getAttestation_res.text
+
+    # try:
+    #     verify = rsa.verify(json.dumps(data).encode(
+    #         "utf-8"), attestation.encode("ascii"), issuerPublicKey)
+    #     verifyResult = "Success"
+    # except rsa.pkcs1.VerificationError as e:
+    #     verifyResult = "Failed"
 
     return json.dumps({
+        # "verifyResult": verifyResult,
         "result": "X",
-        "attestationRes": SC_getAttestation_res.text
+        # "req": json.dumps(SC_getAttestation_payload),
+        "attestationRes": attestation
     })
 
 

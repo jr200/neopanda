@@ -123,11 +123,16 @@ def Main(operation, args):
 
         issuer_user_key = concat(from_issuer, user_id)
 
+        print("THEissueruserkey")
+        print(issuer_user_key)
+
         context = GetContext()
         attestation = Get(context, issuer_user_key)
-
         print("THEattestation")
         print(attestation)
+
+        if not attestation or attestation == "":
+            return "Failed"
 
         blacklist_bytes = Get(context, "blacklist")
         actual_blacklist = deserialize_bytearray(blacklist_bytes)
