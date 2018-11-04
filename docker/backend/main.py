@@ -34,7 +34,6 @@ INVALID_FIELD = 2
 
 HASH_METHOD = "SHA-512"
 CONTRACT_HASH = "0x42f4812ca95d2e1530b2cc19964340a3e881266e"
-ISSUER = "Munich"
 
 
 @app.route("/")
@@ -42,7 +41,7 @@ def default():
     return "Here is nothing"
 
 
-def getPublicKey(identity):
+def getKeys(identity):
 
     id_map = {
         "tai.lung@gmail.com": {
@@ -189,7 +188,7 @@ def onboardPerson():
     signedUserId = request.json["signedUserId"]
     signedUserId = base64.decodestring(signedUserId.encode("ascii"))
 
-    issuerPrivateKeyFile = getPublicKey("Munich")["private"]
+    issuerPrivateKeyFile = getKeys("Munich")["private"]
     with open(issuerPrivateKeyFile, 'r') as f:
         file_data = f.read()
 
@@ -198,7 +197,7 @@ def onboardPerson():
     signedDocHash = rsa.sign_hash(docHash, issuerPrivateKey, HASH_METHOD)
     signedDocHash = base64.encodestring(signedDocHash).decode("ascii")
 
-    userPublicKeyFile = getPublicKey(user_id)["public"]
+    userPublicKeyFile = getKeys(user_id)["public"]
     print(userPublicKeyFile)
     with open(userPublicKeyFile, 'r', encoding="ascii") as f:
         file_data = f.read()
@@ -268,18 +267,43 @@ def checkAttestation():
     elif validation_result == INVALID_FIELD:
         return getJsonResponse(400, "Error", "Not all fields are valid")
 
-    SC_payload = {
+    data = request.json["data"]
+    user_id = data["userId"]
+    print(user_id)
+    signedUserId = request.json["signedUserId"]
+    signedUserId = base64.decodestring(signedUserId.encode("ascii"))
+
+    docHash = rsa.compute_hash(json.dumps(data).encode("utf-8"), HASH_METHOD)
+
+    issuerId = request.json["issuerId"]
+    issuerPublicKeyFile = getKeys(issuerId)["public"]
+    with open(issuerPublicKeyFile, 'r', encoding="ascii") as f:
+        file_data = f.read()
+
+    issuerPublicKey = rsa.PublicKey.load_pkcs1(file_data)
+    try:
+        verify = rsa.verify(json.dumps(data).encode(
+            "utf-8"), signedUserId, issuerPublicKey)
+        verifyResult = "Success"
+    except rsa.pkcs1.VerificationError as e:
+        verifyResult = "Failed"
+
+    SC_getAttestation_payload = {
         "jsonrpc": "2.0",
         "method": "invokefunction",
         "params": [
-            "0x51f0b4bc4c048f3a9c4013cdc7b9e80fbe917226",
+            CONTRACT_HASH,
             ["getAttestation",
-             ["Munich", "userId"]
-
+             [issuerId, user_id]
              ]]
     }
+    SC_getAttestation_res = requests.post(
+        "http://neo-nodes:30333/testNeoConnection", json=SC_getAttestation_payload)
 
-    return getJsonResponse(200, "Approved", "Attestation approved")
+    return json.dumps({
+        "result": "X",
+        "attestationRes": SC_getAttestation_res.text
+    })
 
 
 def validateDocumentData(documentData):

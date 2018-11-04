@@ -117,8 +117,6 @@ def Main(operation, args):
         Put(context, issuer_user_key, attestation)
         return "Success"
 
-        # return OnboardAttestation(issuer, user_id, attestation)
-
     elif operation == 'getAttestation':
         from_issuer = args[0]
         user_id = args[1]
@@ -130,6 +128,16 @@ def Main(operation, args):
 
         print("THEattestation")
         print(attestation)
+
+        blacklist_bytes = Get(context, "blacklist")
+        actual_blacklist = deserialize_bytearray(blacklist_bytes)
+
+        print("THEactualblacklist")
+        print(actual_blacklist)
+
+        for blacklisted_attestation in actual_blacklist:
+            if blacklisted_attestation == attestation:
+                return "Attestation has been Revoked!"
 
         return attestation
 
@@ -161,21 +169,5 @@ def Main(operation, args):
         Put(context, "blacklist", new_blacklist)
 
         return "Success"
-
-    elif operation == "isAttestationValid":
-        attestation = args[0]
-
-        context = GetContext()
-        blacklist_bytes = Get(context, "blacklist")
-        actual_blacklist = deserialize_bytearray(blacklist_bytes)
-
-        print("THEactualblacklist")
-        print(actual_blacklist)
-
-        for blacklisted_attestation in actual_blacklist:
-            if blacklisted_attestation == attestation:
-                return "Invalid"
-
-        return "Valid"
 
     return "Error: operation not recognised"
