@@ -115,7 +115,7 @@ def Main(operation, args):
         #     return False
 
         Put(context, issuer_user_key, attestation)
-        return "Done"
+        return "Success"
 
         # return OnboardAttestation(issuer, user_id, attestation)
 

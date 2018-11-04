@@ -7,6 +7,24 @@ import rsa
 import rsa.pkcs1
 import base64
 
+
+import binascii
+import hashlib
+from neo.Implementations.Wallets.peewee.UserWallet import UserWallet
+from neo.Core.TX.InvocationTransaction import InvocationTransaction
+from neo.Core.TX.TransactionAttribute import TransactionAttribute, TransactionAttributeUsage
+from neo.Core.CoinReference import CoinReference
+from neo.SmartContract.ContractParameterContext import ContractParametersContext
+from neocore.Fixed8 import Fixed8
+from neocore.UInt256 import UInt256
+from neocore.UInt160 import UInt160
+from neocore.KeyPair import KeyPair
+from neo import Blockchain
+from base58 import b58decode
+from neo.VM.ScriptBuilder import ScriptBuilder
+from neo.Wallets.utils import to_aes_key
+
+
 app = Flask(__name__)
 cors = CORS(app)
 
@@ -15,6 +33,8 @@ NO_DATA = 1
 INVALID_FIELD = 2
 
 HASH_METHOD = "SHA-512"
+CONTRACT_HASH = "0x42f4812ca95d2e1530b2cc19964340a3e881266e"
+ISSUER = "Munich"
 
 
 @app.route("/")
@@ -111,6 +131,48 @@ def testNeoConnection():
     return json.dumps(result)
 
 
+@app.route("/testNeoClient", methods=["POST", "GET"])
+def testNeoClient():
+    invocation_tx = InvocationTransaction()
+
+    smartcontract_scripthash = UInt160.ParseString(CONTRACT_HASH)
+    sb = ScriptBuilder()
+    sb.EmitAppCallWithOperationAndArgs(
+        smartcontract_scripthash,
+        'onboard',
+        [b'Munich', b'tai.lung@mail.com', b'xxx'])
+    invocation_tx.Script = binascii.unhexlify(sb.ToArray())
+
+    wallet = UserWallet.Create(
+        'neo-privnet.wallet', to_aes_key('coz'), generate_default_key=False)
+    private_key = KeyPair.PrivateKeyFromWIF(
+        "KxDgvEKzgSBPPfuVfw67oPQBSjidEiqTHURKSDL1R7yGaGYAeYnr")
+
+    wallet.CreateKey(private_key)
+    context = ContractParametersContext(invocation_tx)
+    wallet.Sign(context)
+
+    invocation_tx.scripts = context.GetScripts()
+    raw_tx = invocation_tx.ToArray()
+
+    payload = {"jsonrpc": "2.0", "id": 1,
+               "method": "sendrawtransaction",
+               "params": [raw_tx.decode("ascii")]}
+
+    res = requests.post(
+        "http://neo-nodes:30333/testNeoConnection", json=payload)
+    print("received POST result")
+    print(res.status_code)
+    result = res.text
+    print(result)
+
+    return json.dumps({
+        "raw_tx": raw_tx.decode("ascii"),
+        "result": result,
+        "payload": payload,
+    })
+
+
 @app.route("/onboardPerson", methods=["POST", "GET"])
 def onboardPerson():
     print("called onboardPerson", file=sys.stderr)
@@ -151,25 +213,46 @@ def onboardPerson():
         verifyUserResult = "Failed"
 
     # post to blockchain
-    SC_onboardPayload = [
-        "Munich",
-        user_id,
-        signedDocHash
-    ]
+    invocation_tx = InvocationTransaction()
 
-    sc_res = requests.post(
-        "http://neo-nodes:30333/onboard", json=SC_onboardPayload)
+    smartcontract_scripthash = UInt160.ParseString(CONTRACT_HASH)
+    sb = ScriptBuilder()
+    sb.EmitAppCallWithOperationAndArgs(
+        smartcontract_scripthash,
+        'onboard',
+        [b'Munich1', b'tai.lung@mail.com1', b'xxx'])
+    invocation_tx.Script = binascii.unhexlify(sb.ToArray())
+
+    wallet = UserWallet.Create(
+        'neo-privnet.wallet', to_aes_key('coz'), generate_default_key=False)
+    private_key = KeyPair.PrivateKeyFromWIF(
+        "KxDgvEKzgSBPPfuVfw67oPQBSjidEiqTHURKSDL1R7yGaGYAeYnr")
+
+    wallet.CreateKey(private_key)
+    context = ContractParametersContext(invocation_tx)
+    wallet.Sign(context)
+
+    invocation_tx.scripts = context.GetScripts()
+    raw_tx = invocation_tx.ToArray()
+
+    payload = {"jsonrpc": "2.0", "id": 1,
+               "method": "sendrawtransaction",
+               "params": [raw_tx.decode("ascii")]}
+
+    res = requests.post(
+        "http://neo-nodes:30333/testNeoConnection", json=payload)
     print("received POST result")
-    print(sc_res.status_code)
-    # result = sc_res.json()
-    # print(result)
+    print(res.status_code)
+    result = res.text
+    print(result)
 
     res = {
         "docHash": base64.encodestring(docHash).decode("ascii"),
         "signedDocHash": signedDocHash,
         "verifyUserResult": verifyUserResult,
-        # "smartContractResult": result
-
+        "smartContractResult": result,
+        "raw_tx": raw_tx.decode("ascii"),
+        "payload": payload,
     }
 
     return json.dumps(res)
@@ -184,6 +267,17 @@ def checkAttestation():
         return getJsonResponse(400, "Error", "No attestation data provided")
     elif validation_result == INVALID_FIELD:
         return getJsonResponse(400, "Error", "Not all fields are valid")
+
+    SC_payload = {
+        "jsonrpc": "2.0",
+        "method": "invokefunction",
+        "params": [
+            "0x51f0b4bc4c048f3a9c4013cdc7b9e80fbe917226",
+            ["getAttestation",
+             ["Munich", "userId"]
+
+             ]]
+    }
 
     return getJsonResponse(200, "Approved", "Attestation approved")
 
