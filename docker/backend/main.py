@@ -3,6 +3,9 @@ import sys
 import requests
 from flask import Flask, request
 from flask_cors import CORS
+import rsa
+import rsa.pkcs1
+import base64
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -11,10 +14,70 @@ VALID_DATA = 0
 NO_DATA = 1
 INVALID_FIELD = 2
 
+HASH_METHOD = "SHA-512"
+
 
 @app.route("/")
 def default():
     return "Here is nothing"
+
+
+@app.route("/signData", methods=["POST", "GET"])
+def signData():
+    user_id = request.json["userId"]
+    privateKeyFile = request.json["privateKeyFile"]
+
+    with open(privateKeyFile, 'r') as f:
+        file_data = f.read()
+
+    privateKey = rsa.PrivateKey.load_pkcs1(file_data, "PEM")
+
+    user_id_hash = rsa.compute_hash(user_id.encode("utf-8"), HASH_METHOD)
+
+    signedUserId = rsa.sign_hash(user_id_hash, privateKey, HASH_METHOD)
+    print(signedUserId)
+    signedUserId = base64.encodestring(signedUserId).decode("ascii")
+
+    res = {
+        "userId": user_id,
+        "userIdHash": base64.encodestring(user_id_hash).decode("ascii"),
+        "privateKeyFile": privateKeyFile,
+        "signedUserId": signedUserId
+    }
+
+    return json.dumps(res)
+
+
+@app.route("/verifyData", methods=["POST", "GET"])
+def verifyData():
+    user_id = request.json["userId"]
+    signedUserId = request.json["signedUserId"]
+    publicKeyFile = request.json["publicKeyFile"]
+
+    user_id_hash = rsa.compute_hash(user_id.encode("utf-8"), HASH_METHOD)
+
+    with open(publicKeyFile, 'r', encoding="ascii") as f:
+        file_data = f.read()
+
+    publicKey = rsa.PublicKey.load_pkcs1(file_data)
+    signedUserId = base64.decodestring(signedUserId.encode("ascii"))
+
+    try:
+        verify = rsa.verify(user_id.encode("utf-8"), signedUserId, publicKey)
+        verifyResult = "Success"
+    except rsa.pkcs1.VerificationError as e:
+        verifyResult = "Failed"
+        raise e
+
+    res = {
+        "userId": user_id,
+        "userIdHash": base64.encodestring(user_id_hash).decode("ascii"),
+        "publicKeyFile": publicKeyFile,
+        # "signedUserId": signedUserId,
+        "verifyResult": verifyResult
+    }
+
+    return json.dumps(res)
 
 
 @app.route("/testNeoConnection", methods=["POST", "GET"])
