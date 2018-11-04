@@ -128,11 +128,12 @@ def Main(operation, args):
 
         context = GetContext()
         attestation = Get(context, issuer_user_key)
-        print("THEattestation")
+        print("THEattestationx")
         print(attestation)
 
         if not attestation or attestation == "":
-            return "Failed"
+            msg = concat("Failed_", issuer_user_key)
+            return msg
 
         blacklist_bytes = Get(context, "blacklist")
         actual_blacklist = deserialize_bytearray(blacklist_bytes)
