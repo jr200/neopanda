@@ -1,19 +1,21 @@
 <template>
   <div class="container">
-    <div class="large-12 medium-12 small-12 cell">
+    <div class="file_upload">
       <label>
         File
         <input type="file" id="file" ref="file" v-on:change="handleFileUpload()"/>
       </label>
-        <v-btn v-on:click="submitFile()">Submit</v-btn>
     </div>
-    <div class="user_id">
+    <!-- <div class="user_id">
       <v-text-field
         label="User Id"
         outline
         required
         v-model="userId">
       </v-text-field>
+    </div> -->
+    <div class="submit">
+      <v-btn v-on:click="submitFile()">Submit</v-btn>
     </div>
   </div>
 </template>
@@ -65,23 +67,18 @@ import axios from 'axios';
         }).then((response) => {
                console.log(response);
         });
-        // const body = {
-        //   name: "DuckDuckGo",
-        //   version: "1.1"
-        // }
-        // console.log("Sending POST with body", body);
-        // let uri = 'http://localhost:80/temp';
-        //     axios.post(uri, body).then((response) => {
-        //        console.log(response);
-        //     });
       },
     }
   }
 </script>
 
 <style scoped>
-  .user_id {
-    margin-top: 20px;
-    width: 20%;
+  .file_upload {
+    margin-top: 50px;
+    margin-left: 50px;
+  }
+  .submit {
+    margin-top: 50px;
+    margin-left: 50px;
   }
 </style>
